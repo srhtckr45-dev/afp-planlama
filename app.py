@@ -827,28 +827,24 @@ with tab_ai_planning:
 
             if not os.path.exists(DB_PATH):
                 st.info('Lütfen önce veritabanını oluşturun.')
-                st.stop()
-            conn_temp2 = sqlite3.connect(DB_PATH)
-            for lot in saved_urgent_lots:
-                # Need to match lot strictly. Often lot has .0 or similar, but let's do a simple LIKE or exact match
-                df_status = pd.read_sql(f"SELECT [SİPARİŞ DURUMU] FROM programs WHERE LOT LIKE '{lot}%'", conn_temp2)
-                
-                is_finished = False
-                if not df_status.empty:
-                    # If all matching records are BİTTİ (or similar completed status)
-                    statuses = df_status['SİPARİŞ DURUMU'].astype(str).str.strip().str.upper().tolist()
-                    if all(s == 'BİTTİ' for s in statuses):
-                        is_finished = True
-                
-                col_lot1, col_lot2 = st.columns([4, 1])
-                with col_lot1:
-                    if is_finished:
-                        st.success(f"✅ {lot} (Üretimi Bitti - Silebilirsiniz)")
-                    else:
-                        st.info(f"⏳ {lot} (Kuyrukta / Üretimde)")
-                with col_lot2:
-                    if st.button("🗑️ Sil", key=f"del_lot_{lot}"):
-                        lots_to_remove.append(lot)
+                conn_temp2 = None
+            else:
+                conn_temp2 = sqlite3.connect(DB_PATH)
+            if conn_temp2:
+                for lot in saved_urgent_lots:
+                    df_status = pd.read_sql(f"SELECT [SİPARİŞ DURUMU] FROM programs WHERE LOT LIKE '{lot}%'", conn_temp2)
+                    is_finished = False
+                    if not df_status.empty:
+                        statuses = df_status['SİPARİŞ DURUMU'].astype(str).str.strip().str.upper().tolist()
+                        if all(s == 'BİTTİ' for s in statuses):
+                            is_finished = True
+                    col_lot1, col_lot2 = st.columns([4, 1])
+                    with col_lot1:
+                        status_emoji = "✅ (Bitti)" if is_finished else "⏳ (Devam Ediyor)"
+                        st.write(f"• **{lot}** - {status_emoji}")
+                    with col_lot2:
+                        if st.button("🗑️ Sil", key=f"del_lot_{lot}"):
+                            lots_to_remove.append(lot)
             conn_temp2.close()
             
             if lots_to_remove:
