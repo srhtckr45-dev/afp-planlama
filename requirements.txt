@@ -4,3 +4,4 @@ openpyxl
 requests
 altair
 streamlit-sortables
+fpdf
