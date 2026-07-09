@@ -845,7 +845,8 @@ with tab_ai_planning:
                     with col_lot2:
                         if st.button("🗑️ Sil", key=f"del_lot_{lot}"):
                             lots_to_remove.append(lot)
-            conn_temp2.close()
+            if conn_temp2:
+                conn_temp2.close()
             
             if lots_to_remove:
                 for l in lots_to_remove:
