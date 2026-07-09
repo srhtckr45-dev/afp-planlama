@@ -1260,92 +1260,93 @@ with tab_planning:
                     
                     with col_drag:
                         with st.expander("↕️ Sürükle-Bırak ile Sıralamayı Değiştir (Drag & Drop)", expanded=True):
-                        st.markdown("<p style='font-size:0.9rem; color:#666;'>Ögeleri sürükleyip bırakarak yeni üretim sırasını belirleyin ve ardından aşağıdaki kaydet butonuna basın.</p>", unsafe_allow_html=True)
+                            st.markdown("<p style='font-size:0.9rem; color:#666;'>Ögeleri sürükleyip bırakarak yeni üretim sırasını belirleyin ve ardından aşağıdaki kaydet butonuna basın.</p>", unsafe_allow_html=True)
+                            
+                            # Format items for draggable list
+                            sort_list = []
+                            for idx, (_, row) in enumerate(queue_df.iterrows(), 1):
+                                sort_list.append(f"📦 Sıra {idx}: LOT {row['LOT']} - {row.get('STANDART', '')} ({row.get('ÇAP', '')}x{row.get('BOY', '')}) - {row.get('MÜŞTERİ', '')}")
+                            
+                            # Render sortables widget
+                            import hashlib
+                            list_hash = hashlib.md5(str(sort_list).encode('utf-8')).hexdigest()
+                            sorted_items = sort_items(sort_list, direction="vertical", key=f"sort_{selected_machine}_{list_hash}")
+                            
+                            if st.button("💾 Yeni Sıralamayı Kaydet", use_container_width=True, type="primary"):
+                                try:
+                                    # Extract lot numbers in the new order
+                                    new_lots = []
+                                    for item in sorted_items:
+                                        parts = item.split("LOT ")
+                                        lot_no = parts[1].split(" - ")[0].strip()
+                                        new_lots.append(lot_no)
+                                        
+                                    # Save to database
+                                    update_lot_sequence(new_lots)
+                                    st.session_state.modified_machines.add(selected_machine)
+                                    st.success("Yeni üretim sıralaması veritabanına başarıyla kaydedildi!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Sıralama kaydedilirken hata oluştu: {e}")
+                    
+                    with col_actions:
+                        st.markdown("<div style='background-color:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;'>", unsafe_allow_html=True)
+                        st.subheader("Planı Düzenle")
                         
-                        # Format items for draggable list
-                        sort_list = []
-                        for idx, (_, row) in enumerate(queue_df.iterrows(), 1):
-                            sort_list.append(f"📦 Sıra {idx}: LOT {row['LOT']} - {row.get('STANDART', '')} ({row.get('ÇAP', '')}x{row.get('BOY', '')}) - {row.get('MÜŞTERİ', '')}")
+                        # Target lot selection
+                        lot_list = queue_df["LOT"].tolist()
+                        target_lot = st.selectbox("İşlem Yapılacak Lot Seçin:", lot_list)
                         
-                        # Render sortables widget
-                        import hashlib
-                        list_hash = hashlib.md5(str(sort_list).encode('utf-8')).hexdigest()
-                        sorted_items = sort_items(sort_list, direction="vertical", key=f"sort_{selected_machine}_{list_hash}")
+                        # Ordering Buttons
+                        idx = lot_list.index(target_lot) if target_lot in lot_list else -1
                         
-                        if st.button("💾 Yeni Sıralamayı Kaydet", use_container_width=True, type="primary"):
-                            try:
-                                # Extract lot numbers in the new order
-                                new_lots = []
-                                for item in sorted_items:
-                                    parts = item.split("LOT ")
-                                    lot_no = parts[1].split(" - ")[0].strip()
-                                    new_lots.append(lot_no)
-                                    
-                                # Save to database
-                                update_lot_sequence(new_lots)
+                        btn_up, btn_down = st.columns(2)
+                        with btn_up:
+                            if st.button("⬆️ Yukarı Taşı", use_container_width=True) and idx > 0:
+                                lot_list[idx], lot_list[idx-1] = lot_list[idx-1], lot_list[idx]
+                                update_lot_sequence(lot_list)
                                 st.session_state.modified_machines.add(selected_machine)
-                                st.success("Yeni üretim sıralaması veritabanına başarıyla kaydedildi!")
+                                st.success(f"{target_lot} sırası yukarı alındı.")
                                 st.rerun()
-                            except Exception as e:
-                                st.error(f"Sıralama kaydedilirken hata oluştu: {e}")
-                
-                with col_actions:
-                    st.markdown("<div style='background-color:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #ddd;'>", unsafe_allow_html=True)
-                    st.subheader("Planı Düzenle")
-                    
-                    # Target lot selection
-                    lot_list = queue_df["LOT"].tolist()
-                    target_lot = st.selectbox("İşlem Yapılacak Lot Seçin:", lot_list)
-                    
-                    # Ordering Buttons
-                    idx = lot_list.index(target_lot) if target_lot in lot_list else -1
-                    
-                    btn_up, btn_down = st.columns(2)
-                    with btn_up:
-                        if st.button("⬆️ Yukarı Taşı", use_container_width=True) and idx > 0:
-                            lot_list[idx], lot_list[idx-1] = lot_list[idx-1], lot_list[idx]
+                                
+                        with btn_down:
+                            if st.button("⬇️ Aşağı Taşı", use_container_width=True) and idx < len(lot_list) - 1:
+                                lot_list[idx], lot_list[idx+1] = lot_list[idx+1], lot_list[idx]
+                                update_lot_sequence(lot_list)
+                                st.session_state.modified_machines.add(selected_machine)
+                                st.success(f"{target_lot} sırası aşağı alındı.")
+                                st.rerun()
+                                
+                        if st.button("🔝 En Üste Taşı", use_container_width=True) and idx > 0:
+                            lot_list.insert(0, lot_list.pop(idx))
                             update_lot_sequence(lot_list)
                             st.session_state.modified_machines.add(selected_machine)
-                            st.success(f"{target_lot} sırası yukarı alındı.")
+                            st.success(f"{target_lot} en üste taşındı.")
                             st.rerun()
                             
-                    with btn_down:
-                        if st.button("⬇️ Aşağı Taşı", use_container_width=True) and idx < len(lot_list) - 1:
-                            lot_list[idx], lot_list[idx+1] = lot_list[idx+1], lot_list[idx]
-                            update_lot_sequence(lot_list)
+                        st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                        
+                        # Status / Machine Change ACTIONS
+                        new_status = st.selectbox("Durum Değiştir:", ["BİTMEDİ", "BİTTİ"])
+                        if st.button("Durumu Güncelle", use_container_width=True):
+                            update_lot_fields(target_lot, {"SİPARİŞ DURUMU": new_status})
                             st.session_state.modified_machines.add(selected_machine)
-                            st.success(f"{target_lot} sırası aşağı alındı.")
+                            st.success(f"{target_lot} durumu '{new_status}' olarak güncellendi.")
                             st.rerun()
                             
-                    if st.button("🔝 En Üste Taşı", use_container_width=True) and idx > 0:
-                        lot_list.insert(0, lot_list.pop(idx))
-                        update_lot_sequence(lot_list)
-                        st.session_state.modified_machines.add(selected_machine)
-                        st.success(f"{target_lot} en üste taşındı.")
-                        st.rerun()
-                        
-                    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-                    
-                    # Status / Machine Change ACTIONS
-                    new_status = st.selectbox("Durum Değiştir:", ["BİTMEDİ", "BİTTİ"])
-                    if st.button("Durumu Güncelle", use_container_width=True):
-                        update_lot_fields(target_lot, {"SİPARİŞ DURUMU": new_status})
-                        st.session_state.modified_machines.add(selected_machine)
-                        st.success(f"{target_lot} durumu '{new_status}' olarak güncellendi.")
-                        st.rerun()
-                        
-                    new_machine = st.selectbox("Makinayı Değiştir:", machines, index=machines.index(selected_machine))
-                    if st.button("Makineye Gönder", use_container_width=True) and new_machine != selected_machine:
-                        # Append to the end of the target machine queue
-                        target_queue = get_active_queue(new_machine)
-                        new_sira = float(len(target_queue) + 1)
-                        update_lot_fields(target_lot, {"MAKİNE": new_machine, "sıra": new_sira})
-                        st.session_state.modified_machines.add(selected_machine)
-                        st.session_state.modified_machines.add(new_machine)
-                        st.success(f"{target_lot} Loti {new_machine} makinesine aktarıldı.")
-                        st.rerun()
-                        
-                    st.markdown("</div>", unsafe_allow_html=True)
+                        new_machine = st.selectbox("Makinayı Değiştir:", machines, index=machines.index(selected_machine))
+                        if st.button("Makineye Gönder", use_container_width=True) and new_machine != selected_machine:
+                            # Append to the end of the target machine queue
+                            target_queue = get_active_queue(new_machine)
+                            new_sira = float(len(target_queue) + 1)
+                            update_lot_fields(target_lot, {"MAKİNE": new_machine, "sıra": new_sira})
+                            st.session_state.modified_machines.add(selected_machine)
+                            st.session_state.modified_machines.add(new_machine)
+                            st.success(f"{target_lot} Loti {new_machine} makinesine aktarıldı.")
+                            st.rerun()
+                            
+                        st.markdown("</div>", unsafe_allow_html=True)
+
             else:
                 st.info(f"{selected_machine} makinesine atanmış aktif lot bulunmamaktadır.")
     else:
