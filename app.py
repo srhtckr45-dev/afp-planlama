@@ -1688,7 +1688,13 @@ with tab_sync:
                 old_stdout = sys.stdout
                 sys.stdout = mystdout = StringIO()
                 
-                migrate.run_migration()
+
+                if is_cloud:
+                    excel_url = "https://onedrive.live.com/:x:/g/personal/29A78B54B9AA8C49/IQDM96WlgvXWQqsUB6PR8-QBAaDYLOsoNCiGdExRe9LTHP8?resid=29A78B54B9AA8C49!sa5a5f7ccf58242d6ab1407a3d1f3e401&download=1"
+                    migrate.run_migration(excel_url)
+                else:
+                    migrate.run_migration()
+
                 
                 sys.stdout = old_stdout
                 output_log = mystdout.getvalue()
