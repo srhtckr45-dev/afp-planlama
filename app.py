@@ -1,6 +1,21 @@
 import streamlit as st
 import pandas as pd
 import os
+
+import sqlite3
+try:
+    if os.path.exists("afp_database.db"):
+        if os.path.getsize("afp_database.db") == 0:
+            os.remove("afp_database.db")
+        else:
+            with sqlite3.connect("afp_database.db") as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='programs'")
+                if not cur.fetchone():
+                    conn.close()
+                    os.remove("afp_database.db")
+except Exception:
+    pass
 import datetime
 from database import (
     get_machines,
@@ -809,6 +824,10 @@ with tab_ai_planning:
             lots_to_remove = []
             
             # Query DB for statuses
+
+            if not os.path.exists(DB_PATH):
+                st.info('Lütfen önce veritabanını oluşturun.')
+                st.stop()
             conn_temp2 = sqlite3.connect(DB_PATH)
             for lot in saved_urgent_lots:
                 # Need to match lot strictly. Often lot has .0 or similar, but let's do a simple LIKE or exact match
