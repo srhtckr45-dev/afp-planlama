@@ -1255,10 +1255,11 @@ with tab_planning:
                 st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
                 
                 # Render controls and drag-and-drop section side-by-side below the table
-                col_drag, col_actions = st.columns([2, 1])
-                
-                with col_drag:
-                    with st.expander("↕️ Sürükle-Bırak ile Sıralamayı Değiştir (Drag & Drop)", expanded=True) if not is_cloud else st.container():
+                if not is_cloud:
+                    col_drag, col_actions = st.columns([2, 1])
+                    
+                    with col_drag:
+                        with st.expander("↕️ Sürükle-Bırak ile Sıralamayı Değiştir (Drag & Drop)", expanded=True):
                         st.markdown("<p style='font-size:0.9rem; color:#666;'>Ögeleri sürükleyip bırakarak yeni üretim sırasını belirleyin ve ardından aşağıdaki kaydet butonuna basın.</p>", unsafe_allow_html=True)
                         
                         # Format items for draggable list
@@ -1267,15 +1268,11 @@ with tab_planning:
                             sort_list.append(f"📦 Sıra {idx}: LOT {row['LOT']} - {row.get('STANDART', '')} ({row.get('ÇAP', '')}x{row.get('BOY', '')}) - {row.get('MÜŞTERİ', '')}")
                         
                         # Render sortables widget
-                        if is_cloud:
-                            st.info("Bulut sisteminde sıralama değişikliği yapılamaz (Sadece Okunur).")
-                            sorted_items = sort_list
-                        else:
-                            import hashlib
-                            list_hash = hashlib.md5(str(sort_list).encode('utf-8')).hexdigest()
-                            sorted_items = sort_items(sort_list, direction="vertical", key=f"sort_{selected_machine}_{list_hash}")
+                        import hashlib
+                        list_hash = hashlib.md5(str(sort_list).encode('utf-8')).hexdigest()
+                        sorted_items = sort_items(sort_list, direction="vertical", key=f"sort_{selected_machine}_{list_hash}")
                         
-                        if not is_cloud and st.button("💾 Yeni Sıralamayı Kaydet", use_container_width=True, type="primary"):
+                        if st.button("💾 Yeni Sıralamayı Kaydet", use_container_width=True, type="primary"):
                             try:
                                 # Extract lot numbers in the new order
                                 new_lots = []
