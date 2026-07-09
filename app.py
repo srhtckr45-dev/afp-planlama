@@ -572,161 +572,164 @@ with tab_simulator:
                     d[key] = {"KG": 0.0, "Adet": 0.0}
                 d[key]["KG"] += kg
                 d[key]["Adet"] += adet
+        if not os.path.exists(DB_PATH):
+            st.info('Lütfen önce veritabanını oluşturun.')
+        else:
 
-        from database import get_db_connection
-        import pandas as pd
-        conn = get_db_connection()
-        query = "SELECT * FROM programs WHERE [SİPARİŞ DURUMU] = 'BİTMEDİ' AND MAKİNE IS NOT NULL AND MAKİNE != '' AND MAKİNE != 'nan'"
-        df_sim = pd.read_sql_query(query, conn)
-        conn.close()
+            from database import get_db_connection
+            import pandas as pd
+            conn = get_db_connection()
+            query = "SELECT * FROM programs WHERE [SİPARİŞ DURUMU] = 'BİTMEDİ' AND MAKİNE IS NOT NULL AND MAKİNE != '' AND MAKİNE != 'nan'"
+            df_sim = pd.read_sql_query(query, conn)
+            conn.close()
                 
-        cols = df_sim.columns.tolist()
-        x_col = next((c for c in cols if 'X G' in c.upper() and 'L' in c.upper() and 'K' in c.upper()), 'X GÜNLÜK İŞ')
-        kg_col = next((c for c in cols if 'NET TONAJ' in c.upper()), 'NET TONAJ')
-        adet_col = next((c for c in cols if 'KALAN ADET' in c.upper()), 'KALAN ADET')
+            cols = df_sim.columns.tolist()
+            x_col = next((c for c in cols if 'X G' in c.upper() and 'L' in c.upper() and 'K' in c.upper()), 'X GÜNLÜK İŞ')
+            kg_col = next((c for c in cols if 'NET TONAJ' in c.upper()), 'NET TONAJ')
+            adet_col = next((c for c in cols if 'KALAN ADET' in c.upper()), 'KALAN ADET')
                 
-        machines_active = df_sim['MAKİNE'].unique()
+            machines_active = df_sim['MAKİNE'].unique()
                 
-        for m in machines_active:
-            m_df = df_sim[df_sim['MAKİNE'] == m].copy()
-            m_df['sıra_num'] = pd.to_numeric(m_df['sıra'], errors='coerce').fillna(999999)
-            m_df = m_df.sort_values(by='sıra_num', ascending=True).drop(columns=['sıra_num'])
-            rem_days = float(sim_days)
-            for _, row in m_df.iterrows():
-                if rem_days <= 0:
-                    break
-                lot_days = pd.to_numeric(row.get(x_col, 0), errors='coerce')
-                if pd.isna(lot_days) or lot_days <= 0:
-                    continue
+            for m in machines_active:
+                m_df = df_sim[df_sim['MAKİNE'] == m].copy()
+                m_df['sıra_num'] = pd.to_numeric(m_df['sıra'], errors='coerce').fillna(999999)
+                m_df = m_df.sort_values(by='sıra_num', ascending=True).drop(columns=['sıra_num'])
+                rem_days = float(sim_days)
+                for _, row in m_df.iterrows():
+                    if rem_days <= 0:
+                        break
+                    lot_days = pd.to_numeric(row.get(x_col, 0), errors='coerce')
+                    if pd.isna(lot_days) or lot_days <= 0:
+                        continue
                         
-                l_kg = pd.to_numeric(row.get(kg_col, 0), errors='coerce')
-                l_adet = pd.to_numeric(row.get(adet_col, 0), errors='coerce')
+                    l_kg = pd.to_numeric(row.get(kg_col, 0), errors='coerce')
+                    l_adet = pd.to_numeric(row.get(adet_col, 0), errors='coerce')
                         
-                if pd.isna(l_kg): l_kg = 0
-                if pd.isna(l_adet): l_adet = 0
+                    if pd.isna(l_kg): l_kg = 0
+                    if pd.isna(l_adet): l_adet = 0
                         
-                b = row.get("BÖLGE", "Bilinmiyor")
-                mus = row.get("MÜŞTERİ", "Bilinmiyor")
-                c = row.get("ÇAP", "Bilinmiyor")
-                kal = row.get("KALİTE", "Bilinmiyor")
-                kap = row.get("KAPLAMATIPI", "Bilinmiyor")
+                    b = row.get("BÖLGE", "Bilinmiyor")
+                    mus = row.get("MÜŞTERİ", "Bilinmiyor")
+                    c = row.get("ÇAP", "Bilinmiyor")
+                    kal = row.get("KALİTE", "Bilinmiyor")
+                    kap = row.get("KAPLAMATIPI", "Bilinmiyor")
                         
-                if lot_days <= rem_days:
-                    sim_kg += l_kg
-                    sim_adet += l_adet
-                    add_stats(b, mus, c, kal, kap, l_kg, l_adet)
-                    simulated_lots.append({
-                        "LOT NO": row.get("LOT", ""),
-                        "MAKİNE": m,
-                        "MÜŞTERİ": mus,
-                        "STANDART": row.get("STANDART", ""),
-                        "HAMMADDE": row.get("HAMMADDE", ""),
-                        "AÇIKLAMA": row.get("AÇIKLAMA", ""),
-                        "ÇAP": c,
-                        "KALİTE": kal,
-                        "KAPLAMATIPI": kap,
-                        "KG": l_kg,
-                        "ADET": l_adet,
-                        "DURUM": "TAMAMLANDI"
-                    })
-                    rem_days -= lot_days
-                else:
-                    frac = rem_days / lot_days
-                    sim_kg += l_kg * frac
-                    sim_adet += l_adet * frac
-                    add_stats(b, mus, c, kal, kap, l_kg * frac, l_adet * frac)
-                    simulated_lots.append({
-                        "LOT NO": row.get("LOT", ""),
-                        "MAKİNE": m,
-                        "MÜŞTERİ": mus,
-                        "STANDART": row.get("STANDART", ""),
-                        "HAMMADDE": row.get("HAMMADDE", ""),
-                        "AÇIKLAMA": row.get("AÇIKLAMA", ""),
-                        "ÇAP": c,
-                        "KALİTE": kal,
-                        "KAPLAMATIPI": kap,
-                        "KG": l_kg * frac,
-                        "ADET": l_adet * frac,
-                        "DURUM": f"KISMİ (%{(frac*100):.1f})"
-                    })
-                    rem_days = 0
+                    if lot_days <= rem_days:
+                        sim_kg += l_kg
+                        sim_adet += l_adet
+                        add_stats(b, mus, c, kal, kap, l_kg, l_adet)
+                        simulated_lots.append({
+                            "LOT NO": row.get("LOT", ""),
+                            "MAKİNE": m,
+                            "MÜŞTERİ": mus,
+                            "STANDART": row.get("STANDART", ""),
+                            "HAMMADDE": row.get("HAMMADDE", ""),
+                            "AÇIKLAMA": row.get("AÇIKLAMA", ""),
+                            "ÇAP": c,
+                            "KALİTE": kal,
+                            "KAPLAMATIPI": kap,
+                            "KG": l_kg,
+                            "ADET": l_adet,
+                            "DURUM": "TAMAMLANDI"
+                        })
+                        rem_days -= lot_days
+                    else:
+                        frac = rem_days / lot_days
+                        sim_kg += l_kg * frac
+                        sim_adet += l_adet * frac
+                        add_stats(b, mus, c, kal, kap, l_kg * frac, l_adet * frac)
+                        simulated_lots.append({
+                            "LOT NO": row.get("LOT", ""),
+                            "MAKİNE": m,
+                            "MÜŞTERİ": mus,
+                            "STANDART": row.get("STANDART", ""),
+                            "HAMMADDE": row.get("HAMMADDE", ""),
+                            "AÇIKLAMA": row.get("AÇIKLAMA", ""),
+                            "ÇAP": c,
+                            "KALİTE": kal,
+                            "KAPLAMATIPI": kap,
+                            "KG": l_kg * frac,
+                            "ADET": l_adet * frac,
+                            "DURUM": f"KISMİ (%{(frac*100):.1f})"
+                        })
+                        rem_days = 0
                 
-        st.markdown("<hr>", unsafe_allow_html=True)
-        col_sim1, col_sim2 = st.columns(2)
-        with col_sim1:
-            st.info(f"⚖️ **{sim_days} Günlük Tahmini Ağırlık:** {sim_kg:,.1f} KG ({(sim_kg/1000):,.1f} Ton)")
-        with col_sim2:
-            st.success(f"📦 **{sim_days} Günlük Tahmini Adet:** {sim_adet:,.0f} Adet")
-                    
-        import altair as alt
-                
-        def make_donut(d_dict, title):
-            if not d_dict: return None
-            df = pd.DataFrame([{"Kategori": k, "KG": v["KG"]} for k, v in d_dict.items()])
-            df = df[df["KG"] > 0]
-            if df.empty: return None
-                    
-            df = df.sort_values("KG", ascending=False)
-            df["Yüzde"] = (df["KG"] / df["KG"].sum()) * 100
-            df["Etiket"] = df["Kategori"] + " | " + df["KG"].map(lambda x: f"{x:,.0f} KG") + " (%" + df["Yüzde"].round(1).astype(str) + ")"
-                    
-            chart = alt.Chart(df).mark_arc(innerRadius=50).encode(
-                theta=alt.Theta(field="KG", type="quantitative"),
-                color=alt.Color(field="Etiket", type="nominal", sort=alt.EncodingSortField(field="KG", order="descending"), legend=alt.Legend(title=title, labelLimit=500)),
-                order=alt.Order(field="KG", type="quantitative", sort="descending"),
-                tooltip=["Kategori", alt.Tooltip("KG:Q", format=",.1f"), alt.Tooltip("Yüzde:Q", format=".1f")]
-            ).properties(title=title, height=350)
-            return chart
-                    
-        def make_bar(d_dict, title, top_n=10):
-            if not d_dict: return None
-            df = pd.DataFrame([{"Kategori": k, "KG": v["KG"]} for k, v in d_dict.items()])
-            df = df.sort_values("KG", ascending=False).head(top_n)
-            if df.empty: return None
-                    
-            chart = alt.Chart(df).mark_bar().encode(
-                x=alt.X("KG:Q", title="Tonaj (KG)"),
-                y=alt.Y("Kategori:N", sort="-x", title="", axis=alt.Axis(labelOverlap=False, labelLimit=250)),
-                color=alt.Color("Kategori:N", legend=None),
-                tooltip=["Kategori", alt.Tooltip("KG:Q", format=",.1f")]
-            ).properties(title=title, height=450)
-            return chart
-
-        st.markdown("<h3 class='section-title'>📊 Kırılım Analizleri</h3>", unsafe_allow_html=True)
-                
-        st.markdown("#### 🌍 Yurtiçi / İhracat")
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            ch_bolge = make_donut(stats_bolge, "Bölge Bazlı Tonaj Dağılımı")
-            if ch_bolge: st.altair_chart(ch_bolge, use_container_width=True)
-        with c2:
-            df_bolge = pd.DataFrame([{"Bölge": k, "Ağırlık (KG)": round(v["KG"], 1), "Adet": int(v["Adet"])} for k,v in stats_bolge.items()])
-            st.dataframe(df_bolge, hide_index=True)
-                    
-        st.markdown("#### 🏢 Müşteri Dağılımı")
-        ch_mus = make_bar(stats_musteri, "En Çok Üretim Yapılacak İlk 10 Müşteri")
-        if ch_mus: st.altair_chart(ch_mus, use_container_width=True)
-                
-        st.markdown("#### ⚙️ Ürün Özellikleri")
-        uc1, uc2, uc3 = st.columns(3)
-        with uc1:
-            ch_cap = make_donut(stats_cap, "Çap (Anma Çapı) Dağılımı")
-            if ch_cap: st.altair_chart(ch_cap, use_container_width=True)
-        with uc2:
-            ch_kalite = make_donut(stats_kalite, "Kalite Dağılımı")
-            if ch_kalite: st.altair_chart(ch_kalite, use_container_width=True)
-        with uc3:
-            ch_kaplama = make_donut(stats_kaplama, "Kaplama Tipi Dağılımı")
-            if ch_kaplama: st.altair_chart(ch_kaplama, use_container_width=True)
-            
-        if simulated_lots:
             st.markdown("<hr>", unsafe_allow_html=True)
-            st.markdown("#### 📋 Simülasyon Kapsamına Giren Ürünlerin Listesi", unsafe_allow_html=True)
-            st.markdown("<p style='font-size:13px; color:#555;'>Aşağıdaki tablo, belirlediğiniz gün sayısı boyunca makinelerde işleneceği öngörülen lotların detaylı listesini gösterir.</p>", unsafe_allow_html=True)
-            df_sim_list = pd.DataFrame(simulated_lots)
-            df_sim_list['KG'] = df_sim_list['KG'].apply(lambda x: f"{x:,.1f}")
-            df_sim_list['ADET'] = df_sim_list['ADET'].apply(lambda x: f"{x:,.0f}")
-            st.dataframe(df_sim_list, use_container_width=True, hide_index=True)
+            col_sim1, col_sim2 = st.columns(2)
+            with col_sim1:
+                st.info(f"⚖️ **{sim_days} Günlük Tahmini Ağırlık:** {sim_kg:,.1f} KG ({(sim_kg/1000):,.1f} Ton)")
+            with col_sim2:
+                st.success(f"📦 **{sim_days} Günlük Tahmini Adet:** {sim_adet:,.0f} Adet")
+                    
+            import altair as alt
+                
+            def make_donut(d_dict, title):
+                if not d_dict: return None
+                df = pd.DataFrame([{"Kategori": k, "KG": v["KG"]} for k, v in d_dict.items()])
+                df = df[df["KG"] > 0]
+                if df.empty: return None
+                    
+                df = df.sort_values("KG", ascending=False)
+                df["Yüzde"] = (df["KG"] / df["KG"].sum()) * 100
+                df["Etiket"] = df["Kategori"] + " | " + df["KG"].map(lambda x: f"{x:,.0f} KG") + " (%" + df["Yüzde"].round(1).astype(str) + ")"
+                    
+                chart = alt.Chart(df).mark_arc(innerRadius=50).encode(
+                    theta=alt.Theta(field="KG", type="quantitative"),
+                    color=alt.Color(field="Etiket", type="nominal", sort=alt.EncodingSortField(field="KG", order="descending"), legend=alt.Legend(title=title, labelLimit=500)),
+                    order=alt.Order(field="KG", type="quantitative", sort="descending"),
+                    tooltip=["Kategori", alt.Tooltip("KG:Q", format=",.1f"), alt.Tooltip("Yüzde:Q", format=".1f")]
+                ).properties(title=title, height=350)
+                return chart
+                    
+            def make_bar(d_dict, title, top_n=10):
+                if not d_dict: return None
+                df = pd.DataFrame([{"Kategori": k, "KG": v["KG"]} for k, v in d_dict.items()])
+                df = df.sort_values("KG", ascending=False).head(top_n)
+                if df.empty: return None
+                    
+                chart = alt.Chart(df).mark_bar().encode(
+                    x=alt.X("KG:Q", title="Tonaj (KG)"),
+                    y=alt.Y("Kategori:N", sort="-x", title="", axis=alt.Axis(labelOverlap=False, labelLimit=250)),
+                    color=alt.Color("Kategori:N", legend=None),
+                    tooltip=["Kategori", alt.Tooltip("KG:Q", format=",.1f")]
+                ).properties(title=title, height=450)
+                return chart
+
+            st.markdown("<h3 class='section-title'>📊 Kırılım Analizleri</h3>", unsafe_allow_html=True)
+                
+            st.markdown("#### 🌍 Yurtiçi / İhracat")
+            c1, c2 = st.columns([2, 1])
+            with c1:
+                ch_bolge = make_donut(stats_bolge, "Bölge Bazlı Tonaj Dağılımı")
+                if ch_bolge: st.altair_chart(ch_bolge, use_container_width=True)
+            with c2:
+                df_bolge = pd.DataFrame([{"Bölge": k, "Ağırlık (KG)": round(v["KG"], 1), "Adet": int(v["Adet"])} for k,v in stats_bolge.items()])
+                st.dataframe(df_bolge, hide_index=True)
+                    
+            st.markdown("#### 🏢 Müşteri Dağılımı")
+            ch_mus = make_bar(stats_musteri, "En Çok Üretim Yapılacak İlk 10 Müşteri")
+            if ch_mus: st.altair_chart(ch_mus, use_container_width=True)
+                
+            st.markdown("#### ⚙️ Ürün Özellikleri")
+            uc1, uc2, uc3 = st.columns(3)
+            with uc1:
+                ch_cap = make_donut(stats_cap, "Çap (Anma Çapı) Dağılımı")
+                if ch_cap: st.altair_chart(ch_cap, use_container_width=True)
+            with uc2:
+                ch_kalite = make_donut(stats_kalite, "Kalite Dağılımı")
+                if ch_kalite: st.altair_chart(ch_kalite, use_container_width=True)
+            with uc3:
+                ch_kaplama = make_donut(stats_kaplama, "Kaplama Tipi Dağılımı")
+                if ch_kaplama: st.altair_chart(ch_kaplama, use_container_width=True)
+            
+            if simulated_lots:
+                st.markdown("<hr>", unsafe_allow_html=True)
+                st.markdown("#### 📋 Simülasyon Kapsamına Giren Ürünlerin Listesi", unsafe_allow_html=True)
+                st.markdown("<p style='font-size:13px; color:#555;'>Aşağıdaki tablo, belirlediğiniz gün sayısı boyunca makinelerde işleneceği öngörülen lotların detaylı listesini gösterir.</p>", unsafe_allow_html=True)
+                df_sim_list = pd.DataFrame(simulated_lots)
+                df_sim_list['KG'] = df_sim_list['KG'].apply(lambda x: f"{x:,.1f}")
+                df_sim_list['ADET'] = df_sim_list['ADET'].apply(lambda x: f"{x:,.0f}")
+                st.dataframe(df_sim_list, use_container_width=True, hide_index=True)
 
 with tab_ai_planning:
     st.markdown("<h2 class='section-title'>🤖 Otonom Kapasite Planlama (Yapay Zeka Destekli)</h2>", unsafe_allow_html=True)
